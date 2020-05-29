@@ -20,7 +20,7 @@ expenseRouter.get('/', async (request, response) => {
     }
 
     const decodedToken = jwt.verify(token, process.env.SECRET)
-
+    
     if (!token || !decodedToken) {
         return response.status(401).json({ error: 'token missing or invalid' })
     }    
