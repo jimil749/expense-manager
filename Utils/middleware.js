@@ -8,16 +8,16 @@ const requestLogger = (request, response, next) => {
 }
 
 const unknownEndPoint = (response, request) => {
-    response.status(404).send({ error: 'Unknown End Point'})    
+    return response.status(404).send({ error: 'Unknown End Point'})    
 }
 
 const errorHandler = (err, response, request, next) => {
     logger.error(err.message)
 
     if (err.name === 'CastError') {
-        return res.status(400).send({ error: 'malformatted id' })
+        return response.status(400).send({ error: 'malformatted id' })
     } else if (err.name === 'ValidationError') {
-        return res.status(400).send({ error: err.message })
+        return response.status(400).send({ error: err.message })
     } 
     next(err)
 }

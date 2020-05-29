@@ -30,3 +30,5 @@ userRouter.post('/', async(request, response) => {
     user.expense = user.expense.concat(savedUser._id)
     response.json(savedUser.toJSON())
 })
+
+module.exports = userRouter
