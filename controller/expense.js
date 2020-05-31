@@ -1,3 +1,15 @@
+/* 
+    Backend : 
+    1) User login and sign-up : done
+    2) Add Expense : done
+    3) View User's expense : done
+    4) Testing : done
+    Frontend : 
+    1) User login and sign-up
+    2) Add
+    3) Expense Overview
+
+*/
 const expenseRouter = require('express').Router()
 const Expense = require('../model/Expense')
 const User = require('../model/User')
