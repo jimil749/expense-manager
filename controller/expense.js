@@ -69,12 +69,25 @@ expenseRouter.get('/preview', async(request, response) => {
     yesterday.setUTCHours(0,0,0,0)
     yesterday.setDate(yesterday.getDate-1)
 
-    const expense = await Expense.find({
-        date: {$gte: firstDay, $lte: lastDay}
-    })
-
-    response.json(expense.map(expenses => expenses.toJSON()))
-
+    const expense = await Expense.aggregate([
+        {
+            $facet: {
+                month: [
+                    {$match : { date: {$gte: firstDay, $lte: lastDay}}},
+                    {$group : { _id: "currentMonth", totalSpent: {$sum: "$amount"}}},
+                ],
+                today: [
+                    {$match : { date: {$gte: today, $lte: tomorrow}}},
+                    {$group : { _id: "today", totalSpent: {$sum: "$amount"}}},                
+                ],
+                yesterday: [
+                    {$match : { date: {$gte: yesterday, $lte: today}}},
+                    {$group : { _id: "yesterday", totalSpent: {$sum: "$amount"}}},                
+                ]
+            }
+    }])
+    let expensePreview = {month: expense[0].month[0], today: expense[0].today[0], yesterday: expense[0].yesterday[0]}
+    response.json(expensePreview)
 })
 
 expenseRouter.post('/', async(request, response) => {    
