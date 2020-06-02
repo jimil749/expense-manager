@@ -1,9 +1,5 @@
 /* 
-    Backend : 
-    1) User login and sign-up : done
-    2) Add Expense : done
-    3) View User's expense : done
-    4) Testing : done
+
     Frontend : 
     2) Add
     3) Expense Overview
@@ -13,6 +9,7 @@ const expenseRouter = require('express').Router()
 const Expense = require('../model/Expense')
 const User = require('../model/User')
 const jwt = require('jsonwebtoken')
+const mongoose = require('mongoose')
 
 const getToken = request => {
     const authorization = request.get('authorization')  //authorization header contains web token
@@ -50,8 +47,10 @@ expenseRouter.get('/preview', async(request, response) => {
     
     if (!token || !decodedToken) {
         return response.status(401).json({ error: 'token missing or invalid' })
-    }  
+    }
 
+    const user = await User.findById(decodedToken.id)
+    console.log(user._id)
     const date = new Date()
     const y = date.getFullYear()
     const m = date.getMonth()
@@ -68,26 +67,95 @@ expenseRouter.get('/preview', async(request, response) => {
     const yesterday = new Date()
     yesterday.setUTCHours(0,0,0,0)
     yesterday.setDate(yesterday.getDate-1)
+    try {
+        const expense = await Expense.aggregate([
+            {
+                $facet: {
+                    month: [
+                        {$match : { date: {$gte: firstDay, $lte: lastDay}, user: mongoose.Types.ObjectId(user._id)}},
+                        {$group : { _id: "currentMonth", totalSpent: {$sum: "$amount"}}},
+                    ],
+                    today: [
+                        {$match : { date: {$gte: today, $lte: tomorrow}, user: mongoose.Types.ObjectId(user._id)}},
+                        {$group : { _id: "today", totalSpent: {$sum: "$amount"}}},                
+                    ],
+                    yesterday: [
+                        {$match : { date: {$gte: yesterday, $lte: today}, user: mongoose.Types.ObjectId(user._id)}},
+                        {$group : { _id: "yesterday", totalSpent: {$sum: "$amount"}}},                
+                    ]
+                }
+        }])
+        let expensePreview = {month: expense[0].month[0], today: expense[0].today[0], yesterday: expense[0].yesterday[0]}
+        response.json(expensePreview)
+    } catch(exception) {
+        console.log(exception)
+        response.json({
+            err: 'error occured'
+        })
+    }
 
-    const expense = await Expense.aggregate([
-        {
-            $facet: {
-                month: [
-                    {$match : { date: {$gte: firstDay, $lte: lastDay}}},
-                    {$group : { _id: "currentMonth", totalSpent: {$sum: "$amount"}}},
-                ],
-                today: [
-                    {$match : { date: {$gte: today, $lte: tomorrow}}},
-                    {$group : { _id: "today", totalSpent: {$sum: "$amount"}}},                
-                ],
-                yesterday: [
-                    {$match : { date: {$gte: yesterday, $lte: today}}},
-                    {$group : { _id: "yesterday", totalSpent: {$sum: "$amount"}}},                
-                ]
-            }
-    }])
-    let expensePreview = {month: expense[0].month[0], today: expense[0].today[0], yesterday: expense[0].yesterday[0]}
-    response.json(expensePreview)
+})
+
+expenseRouter.get('/category/preview', async (request, response) => {
+
+    const token = getToken(request)
+    if (token == null) {
+        return response.status(401).json({ error: 'token missing or invalid' })
+    }
+
+    const decodedToken = jwt.verify(token, process.env.SECRET)
+    
+    if (!token || !decodedToken) {
+        return response.status(401).json({ error: 'token missing or invalid' })
+    }
+
+    const user = await User.findById(decodedToken.id)
+    
+    const date = new Date()
+    const y = date.getFullYear()
+    const m = date.getMonth()
+    const firstDay = new Date(y,m,1)
+    const lastDay = new Date(y,m+1,0)
+
+    try {
+        let categoryMonthlyAverage = await Expense.aggregate([
+            {
+                $facet: {
+                    average: [
+                        {$match : { user: mongoose.Types.ObjectId(user._id)}},
+                        {$group : {_id: {category: "$category", month: {$month: "$date"}},totalSpent: {$sum: "$amount"} }},
+                        {$group : {_id: "$_id.category", avgSpent: {$avg: "$totalSpent"}}},
+                        {
+                            $project: {
+                                _id: "$_id", value: {average: "$totalSpent"}
+                            }
+                        }
+                    ],
+                    total: [
+                        {$match : {date: {$gte: firstDay, $lte: lastDay}, user: mongoose.Types.ObjectId(user._id)}},
+                        {$group : {_id: "$category", totalSpent: {$sum: "$amount"}}},
+                        {
+                            $project: {
+                                _id: "$_id", value: {total: "$totalSpent"}
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                $project: {
+                    overview: {$setUnion: ['$average', '$total']},
+                }
+            },
+            {$unwind: '$overview'},
+            {$replaceRoot: {newRoot: "$overview"}},
+            {$group: {_id: "$_id", mergedValues: {$mergeObjects: "$value"}}}
+        ]).exec()
+        response.json(categoryMonthlyAverage)
+    } catch(exception) {
+        console.log(expection)        
+    }
+
 })
 
 expenseRouter.post('/', async(request, response) => {    
@@ -124,6 +192,9 @@ expenseRouter.post('/', async(request, response) => {
         response.json(saveExpense.toJSON())
     } catch(exception) {
         console.log(exception)
+        response.json({
+            'error': 'Cannot add data'
+        })
     }
 })
 
