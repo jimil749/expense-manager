@@ -127,7 +127,7 @@ expenseRouter.get('/category/preview', async (request, response) => {
                         {$group : {_id: "$_id.category", avgSpent: {$avg: "$totalSpent"}}},
                         {
                             $project: {
-                                _id: "$_id", value: {average: "$totalSpent"}
+                                _id: "$_id", value: {average: "$avgSpent"}
                             }
                         }
                     ],
