@@ -1,10 +1,3 @@
-/* 
-
-    Frontend : 
-    2) Add
-    3) Expense Overview
-
-*/
 const expenseRouter = require('express').Router()
 const Expense = require('../model/Expense')
 const User = require('../model/User')
@@ -204,6 +197,42 @@ expenseRouter.post('/', async(request, response) => {
         response.json({
             'error': 'Cannot add data'
         })
+    }
+})
+
+expenseRouter.put('/:id', async(request, response) => {
+    const token = getToken(request)
+    if (token == null) {
+        return response.status(401).json({ error: 'token missing or invalid' })
+    }
+
+    const decodedToken = jwt.verify(token, process.env.SECRET)
+    
+    if (!token || !decodedToken) {
+        return response.status(401).json({ error: 'token missing or invalid' })
+    }
+
+    const body = request.body
+    const expenses = {
+        title: body.title,
+        amount: body.amount,
+        category: body.category,
+        date: body.date,
+        notes: body.notes
+    }
+
+    const user = await User.findById(decodedToken.id)
+    const expense = await Expense.findById(request.params.id)
+    if (user._id.toString() === expense.user.toString()) {
+        try {
+            const updatedExpense = await Expense.findByIdAndUpdate(request.params.id, expenses, { new: true })
+            response.json(updatedExpense.toJSON())            
+        } catch(err) {
+            console.log(err)
+            return  response.status(400).json({
+                error: 'Tokens do not match'
+            })
+        }
     }
 })
 
