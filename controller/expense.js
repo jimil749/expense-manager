@@ -33,8 +33,17 @@ expenseRouter.get('/', async (request, response) => {
         return response.status(401).json({ error: 'token missing or invalid' })
     }    
     const user = await User.findById(decodedToken.id)
-    const expenses = await Expense.find({user: user._id}) 
-    response.json(expenses.map(expense => expense.toJSON()))  
+    let firstDay = request.query.firstDay
+    let lastDay = request.query.lastDay
+    try{
+        const expenses = await Expense.find({'$and': [{'date': {'$gte': firstDay, '$lte': lastDay}}, {'user': user._id}]}).sort('date') 
+        response.json(expenses.map(expense => expense.toJSON()))
+    } catch(exception) {
+        console.log(exception)
+        response.json({
+            err: 'err fetching'
+        })
+    }
 })
 
 expenseRouter.get('/preview', async(request, response) => {
@@ -66,7 +75,7 @@ expenseRouter.get('/preview', async(request, response) => {
 
     const yesterday = new Date()
     yesterday.setUTCHours(0,0,0,0)
-    yesterday.setDate(yesterday.getDate-1)
+    yesterday.setDate(yesterday.getDate()-1)
     try {
         const expense = await Expense.aggregate([
             {
