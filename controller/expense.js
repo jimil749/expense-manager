@@ -236,4 +236,37 @@ expenseRouter.put('/:id', async(request, response) => {
     }
 })
 
+expenseRouter.delete('/:id', async(request, response) => {
+    const token = getToken(request)
+    if (token == null) {
+        return response.status(401).json({ error: 'token missing or invalid' })
+    }
+
+    const decodedToken = jwt.verify(token, process.env.SECRET)
+    
+    if (!token || !decodedToken) {
+        return response.status(401).json({ error: 'token missing or invalid' })
+    }
+
+    const user = await User.findById(decodedToken.id)
+    const expense = await Expense.findById(request.params.id)
+    
+    try {
+        if (user._id.toString() === expense.user.toString()) {
+            await Expense.findByIdAndDelete(request.params.id)
+            return response.status(204).end()
+        } else {
+            return response.status(400).json({
+                error: 'Tokens do not match'
+            })
+        }
+    } catch(err) {
+        console.log(err)
+        return response.status(400).json({
+            error: err
+        })
+    }
+    
+})
+
 module.exports = expenseRouter
