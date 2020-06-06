@@ -269,4 +269,38 @@ expenseRouter.delete('/:id', async(request, response) => {
     
 })
 
+expenseRouter.get('/monthavg', async(request, response) => {
+
+    const token = getToken(request)
+    if (token == null) {
+        return response.status(401).json({ error: 'token missing or invalid' })
+    }
+
+    const decodedToken = jwt.verify(token, process.env.SECRET)
+    
+    if (!token || !decodedToken) {
+        return response.status(401).json({ error: 'token missing or invalid' })
+    }
+
+    const user = await User.findById(decodedToken.id)
+
+    const firstDay = new Date(request.query.firstDay)
+    const lastDay = new Date(request.query.lastDay)
+
+    try {
+        let categoryMonthlyAvg = await Expense.aggregate([
+            {$match: { date: { $gte: firstDay, $lte: lastDay}, user: mongoose.Types.ObjectId(user._id)}},
+            {$group: { _id: {category: "$category"}, totalSpent: {$sum: "$amount"}}},
+            {$group: { _id: "$_id.category", avgSpent: {$avg: "$totalSpent"}}},
+            {$project: {x: '$_id', y: '$avgSpent'}}
+        ]).exec()
+        response.json({monthlyAvg: categoryMonthlyAvg})
+    } catch(err) {
+        console.log(err)
+        return res.status(400).json({
+            error: err
+        })
+    }
+})
+
 module.exports = expenseRouter
