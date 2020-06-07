@@ -303,4 +303,38 @@ expenseRouter.get('/monthavg', async(request, response) => {
     }
 })
 
+expenseRouter.get('/monthExp', async(request, response) => {
+    const token = getToken(request)
+    if (token == null) {
+        return response.status(401).json({ error: 'token missing or invalid' })
+    }
+
+    const decodedToken = jwt.verify(token, process.env.SECRET)
+    
+    if (!token || !decodedToken) {
+        return response.status(401).json({ error: 'token missing or invalid' })
+    }
+
+    const user = await User.findById(decodedToken.id)
+
+    const year = request.query.year
+    const firstDay = new Date(year, 0, 1)
+    const lastDay = new Date(year, 12, 0)
+
+    try {
+        let monthlyExp = await Expense.aggregate([
+            { $match: {date: {$gte: firstDay, $lte: lastDay}, user: mongoose.Types.ObjectId(user._id)}},
+            { $group: {_id: {$month: "$date"}, totalSpent: {$sum: "$amount"}}},
+            { $project: {x: '$_id', y: '$totalSpent'}}
+        ]).exec()
+        response.json({ monthlyExp: monthlyExp })
+    } catch(err) {
+        console.log(err)
+        return response.status(400).json({
+            error: err.message
+        })
+    }
+
+})
+
 module.exports = expenseRouter
